@@ -1,0 +1,30 @@
+---
+- hosts: all
+  connection: local
+  gather_facts: no
+  no_log: true
+  tasks:
+    - block:
+        - name: determine hosts that are up
+          wait_for_connection:
+            timeout: 5
+          vars:
+            ansible_connection: ssh
+        - name: add devices with connectivity to the "running_hosts" group
+          group_by:
+            key: "running_hosts"
+      rescue:
+        - debug: msg="cannot connect to {{inventory_hostname}}"
+
+- hosts: running_hosts
+  gather_facts: no
+  ignore_errors: true
+  ignore_unreachable: true
+  no_log: true
+  vars:
+    # Use system python so apt package is available
+    ansible_python_interpreter: "/usr/bin/env python3"
+  tasks:
+
+#    - debug: msg="{{ inventory_hostname }} is reachable"
+    - name: update cache
