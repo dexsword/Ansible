@@ -1,0 +1,26 @@
+---
+- name: setup dex user
+  hosts: test
+  #become: yes
+  vars:
+    users:
+    - username: dex
+      password: <FILL-THIS-IN>
+  tasks:
+  - name: add Dex Group
+    group:
+      name: "{{ item.username }}"
+      state: present
+  - name: add Dex as a User
+    user:
+      name: "{{ item.username }}"
+      password: "{{ item.password }}"
+      update_password: always
+      comment: dex non-admin account
+      shell: /bin/bash
+      generate_ssh_key: yes
+      ssh_key_bits: 4096
+      ssh_key_file: .ssh/id_rsa
+      groups: sudo,dex
+      append: yes
+    with_items: "{{ users }}"
