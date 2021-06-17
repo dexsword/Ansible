@@ -9,7 +9,7 @@
   tasks:
   - name: add Dex Group
     group:
-      name: "{{ item.username }}"
+      name: dex
       state: present
   - name: add Dex as a User
     user:
