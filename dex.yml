@@ -1,0 +1,64 @@
+---
+- name: setup dex user
+  hosts: test
+  #become: yes
+  vars:
+    users:
+    - username: dex
+      password: $6$l/wd473czKbfsqeC$0GaBX6HDHHViy/z5dpLCLxS83lPcYDymlERhGucRQBirVPmmj0j4fTKFuESZ6KAjD4FZDjV//5PXp6ANAXIvx.
+  tasks:
+  - name: add Dex Group
+    group:
+      name: dex
+      state: present
+  - name: add Dex as a User
+    user:
+      name: "{{ item.username }}"
+      password: "{{ item.password }}"
+      update_password: always
+      comment: dex non-admin account
+      shell: /bin/bash
+      generate_ssh_key: yes
+      ssh_key_bits: 4096
+      ssh_key_file: .ssh/id_rsa
+      groups: sudo,dex
+      append: yes
+    with_items: "{{ users }}"
+      
+- name: check for UFW/RSA
+  hosts: test
+  #become: yes
+  #become_user: dex
+  vars:
+    # Use system python so apt package is available
+    ansible_python_interpreter: "/usr/bin/env python3"
+  tasks:
+  - name: ping
+    ping:
+  - name: UFW Exisits?
+    apt:
+      name: ufw
+      state: latest
+      update_cache: yes
+  - name: Install Easy-RSA
+    apt:
+      name: easy-rsa
+      state: latest
+      update_cache: yes
+  - name: Create a directory if it does not exist
+    ansible.builtin.file:
+      path: ~/easy-rsa
+      state: directory
+      mode: '0700'
+  - name: Create a Symlink?
+    shell:
+      cmd: ln -s /usr/share/easy-rsa/* ~/easy-rsa/
+      creates: ~/easy-rsa/vars.example
+      warn: false
+  - name: Make easy-rsa mine
+    ansible.builtin.file:
+      path: ~/easy-rsa/
+      state: touch
+      mode: 700
+      modification_time: preserve
+      access_time: preserve
