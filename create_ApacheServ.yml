@@ -1,0 +1,116 @@
+---
+- name: setup dex user
+  hosts: test
+  #become: yes
+  vars:
+    users:
+    - username: dex
+      password: $6$J7lUEzV9Ev6X/VKn$3siyj1rRPhAgyLBOxsFl1HvDP/IXG5on38iHNDimZAZsuRhCF/WASkBOwPLufdhXyBHSeWnyMxiYGDmj6RU4f.
+  tasks:
+  - name: add Dex Group
+    group:
+      name: dex
+      state: present
+  - name: add Dex as a User
+    user:
+      name: "{{ item.username }}"
+      password: "{{ item.password }}"
+      update_password: always
+      comment: dex non-admin account
+      shell: /bin/bash
+      generate_ssh_key: yes
+      ssh_key_bits: 4096
+      ssh_key_file: .ssh/id_rsa
+      groups: sudo,dex
+      append: yes
+    with_items: "{{ users }}"
+      
+- name: Check UFW/Install Apache
+  hosts: test
+  #become: yes
+  #become_user: dex
+  #become_method: su
+  vars:
+    # Use system python so apt package is available
+    ansible_python_interpreter: "/usr/bin/env python3"
+  tasks:
+  - name: ping
+    ping:
+  - name: UFW Exisits?
+    apt:
+      name: ufw
+      state: latest
+      update_cache: yes
+  - name: Allow all access to SSH port 22
+    community.general.ufw:
+      rule: allow
+      port: '22'
+      proto: tcp
+  - name: Allow all access to SSH port 22 udp
+    community.general.ufw:
+      rule: allow
+      port: '22'
+      proto: udp
+  - name: Allow all access to TCP port 80
+    community.general.ufw:
+      rule: allow
+      port: '80'
+      proto: tcp
+  - name: Allow all access to TCP port 443
+    community.general.ufw:
+      rule: allow
+      port: '443'
+      proto: tcp
+  - name: Allow all access to UDP port 80
+    community.general.ufw:
+      rule: allow
+      port: '80'
+      proto: udp
+  - name: Allow all access to UDP port 443
+    community.general.ufw:
+      rule: allow
+      port: '443'
+      proto: udp
+  - name: Enable the Firewall
+    community.general.ufw:
+      state: enabled
+      logging: 'on'
+  - name: Install Apache2
+    apt:
+      name: apache2
+      state: latest
+      update_cache: yes
+  - name: Create a directory if it does not exist
+    ansible.builtin.file:
+      path: /var/www/dexserve
+      state: directory
+      owner: dex
+      group: dex
+      mode: '0700'
+- name: UPDATE
+  hosts: test
+  gather_facts: no
+  ignore_errors: true
+  ignore_unreachable: true
+  no_log: true
+  vars:
+    # Use system python so apt package is available
+    ansible_python_interpreter: "/usr/bin/env python3"
+  tasks:
+    - name: update cache
+      apt: update_cache=yes cache_valid_time=3600
+    - name: Upgrade all apt packages
+      apt: upgrade=dist
+    - name: Check if a reboot is needed for Debian and Ubuntu boxes
+      register: reboot_required_file
+      stat: path=/var/run/reboot-required get_md5=no
+    - name: Reboot the Debian or Ubuntu server
+      reboot:
+        msg: "Reboot initiated by Ansible due to kernel updates"
+        connect_timeout: 5
+        reboot_timeout: 300
+        pre_reboot_delay: 0
+        post_reboot_delay: 30
+        test_command: uptime
+      when: reboot_required_file.stat.exists
+
