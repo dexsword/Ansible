@@ -86,7 +86,59 @@
       state: directory
       owner: dex
       group: dex
-      mode: '0700'
+      mode: '0755'
+  - name: Copy Website Files
+    copy:
+      src: /root/DexserveWebServ_FullBak/dexserve/
+      dest: /var/www/dexserve/
+      mode: '0755'
+  - name: Copy Virtual Hosts File
+    copy:
+      src: /root/DexserveWebServ_FullBak/apache2/
+      dest: /etc/apache2/
+      mode: '0755'
+  - name: Copy Cloudflare pem
+    copy:
+      src: /root/DexserveWebServ_FullBak/cloudflare/
+      dest: /etc/cloudflare/
+      mode: '0755'
+
+  - name: Activates our virtualhost
+    command: a2ensite dexserve
+
+  - name: Check that our config is valid
+    command: apache2ctl configtest
+    register: result
+    ignore_errors: true
+
+  - name: Rolling back - Restoring old default virtualhost
+    command: a2ensite 000-default
+    when: result is failed
+
+  - name: Rolling back - Removing our virtualhost
+    command: a2dissite dexserve
+    when: result is failed
+
+  - name: Rolling back - Ending playbook
+    fail:
+      msg: "Configuration file is not valid. Please check that before re-running the playbook."
+    when: result is failed
+
+  - name: Deactivates the default virtualhost
+    command: a2dissite 000-default
+
+  - name: Deactivates the default ssl virtualhost
+    command: a2dissite default-ssl
+    notify:
+      - restart apache
+
+  handlers:
+  - name: restart apache
+    service:
+      name: apache2
+      state: restarted
+#################################################
+
 - name: UPDATE
   hosts: test
   gather_facts: no
